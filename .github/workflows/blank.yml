@@ -56,5 +56,3 @@ jobs:
           if [[ "$commandStatus" == "COMPLETED" ]]; then
             echo $result 
           fi
-
-      
