@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Authentication
+        id: auth
+        env:
+          STK_CLIENT_REALM: ${{ secrets.STK_CLIENT_REALM }}
+          STK_CLIENT_ID: ${{ secrets.STK_CLIENT_ID }}
+          STK_CLIENT_KEY: ${{ secrets.STK_CLIENT_KEY }}
+        run: |
+          authResponse=$(curl --location --request POST "https://idm.stackspot.com/${STK_CLIENT_REALM}/oidc/oauth/token" \
+          --header "Content-Type: application/x-www-form-urlencoded" \
+          --data-urlencode "client_id=${STK_CLIENT_ID}" \
+          --data-urlencode "grant_type=client_credentials" \
+          --data-urlencode "client_secret=${STK_CLIENT_KEY}")
+          accessToken=$(echo $authResponse | jq -r '.access_token')
+          echo "accessToken=$accessToken" >> $GITHUB_OUTPUT
+      - name: Execute QC
+        id: execute
+        env:
+          STK_SLUG: code-review
+        run: |
+          execute_qc=$(curl --request POST "https://genai-code-buddy-api.stackspot.com/v1/quick-commands/create-execution/${STK_SLUG}" \
+          --header "Authorization: Bearer ${{ steps.auth.outputs.accessToken }}" \
+          --header 'Content-Type: application/json' \
+          --data '{ "input_data": "teste" }')
+          execution_id=$(echo $execute_qc)
+          echo "execution_id=$execution_id" >> $GITHUB_OUTPUT
+      - name: Callback QC
+        run: |
+          commandStatus="RUNNING"
+
+          while [[ "$commandStatus" == "RUNNING" ]]; do
+            statusResponse=$(curl --request GET "https://genai-code-buddy-api.stackspot.com/v1/quick-commands/callback/${{ steps.execute.outputs.execution_id }}" \
+              --header "Authorization: Bearer ${{ steps.auth.outputs.accessToken }}" \
+              --header 'Content-Type: application/json')
+            commandStatus=$(echo "$statusResponse" | jq -r '.progress.status')
+            result=$(echo "$statusResponse" | jq -r '.result | @json' -c)
+            echo "Current command status $commandStatus"
+            echo "Current result $result"
+            sleep 5
+          done
+
+          if [[ "$commandStatus" == "COMPLETED" ]]; then
+            echo $result 
+          fi
+
+      
