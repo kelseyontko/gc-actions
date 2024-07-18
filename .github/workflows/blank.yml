@@ -1,67 +1,39 @@
-name: 'Execute StackSpot AI Remote Quick Command Action'
+name: CI
 
-description: 'Execute StackSpot AI Remote Quick Command'
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
 
-inputs:
-  CLIENT_ID:
-    description: Account client id
-    required: true
-  CLIENT_KEY:
-    description: Account client secret key
-    required: true
-  CLIENT_REALM:
-    description: Account slug
-    required: true
-  QC_SLUG:
-    description: Quick Command slug
-    required: true
-  FILE_EXTENSION:
-    description: File Extension to detect the changes
-    required: true
+permissions:
+  issues: write
+  pull-requests: write
 
-outputs:
-  rqc_result:
-    description: "Remote Quick Command answer"
-    value: ${{ steps.rqc.outputs.result }}
 
-runs:
-  using: "composite"
-  steps:
-    - name: Setup Python
-      uses: actions/setup-python@v5.1.0
-      with:
-        python-version: '3.12' 
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # Checkout the repository with a fetch depth of 2
+      - uses: actions/checkout@v4
+        with: 
+          fetch-depth: 2
 
-    - name: Install python libraries 
-      run: pip install requests
-      shell: bash
+      # Use the StackSpotAI-CICD action to run a remote quick command
+      - uses: victorsilvazup/stackspot-ai-execute-rqc@main
+        id: rqc
+        with:
+          CLIENT_ID: ${{ secrets.STK_CLIENT_ID }}
+          CLIENT_KEY: ${{ secrets.STK_CLIENT_KEY }}
+          CLIENT_REALM: ${{ secrets.STK_CLIENT_REALM }}
+          QC_SLUG: code-analysis
+          FILE_EXTENSION: .md
 
-    - name: List changed files
-      id: list_changed_files
-      shell: bash
-      env:
-        FILE_EXTENSION: ${{ inputs.FILE_EXTENSION }}
-      run: |
-        if (git diff --name-only --diff-filter=d HEAD~1 HEAD | grep "\${{ env.FILE_EXTENSION }}$"); then
-          echo "Listing detected ${FILE_EXTENSION} files."
-          git diff --name-only --diff-filter=d HEAD~1 HEAD | grep "\${{ env.FILE_EXTENSION }}$" > changed_files.txt
-        else
-          echo "No previous commit found. Listing all ${FILE_EXTENSION} files."
-          git ls-files | grep "\${{ env.FILE_EXTENSION }}$" > changed_files.txt
-        fi
-        echo "CHANGED_FILES=$(cat changed_files.txt | tr '\n' ' ')" >> $GITHUB_ENV
-
-    - name: Run StackSpot AI Remote Quick Command
-      id: rqc
-      run: python3 ${GITHUB_ACTION_PATH}/remote_quick_command.py
-      shell: bash
-      env:
-        CLIENT_ID: ${{ inputs.CLIENT_ID }}
-        CLIENT_KEY: ${{ inputs.CLIENT_KEY }}
-        CLIENT_REALM: ${{ inputs.CLIENT_REALM }}
-        QC_SLUG: ${{ inputs.QC_SLUG }}
-        CHANGED_FILES: ${{ env.CHANGED_FILES }}
-
-branding:
-    icon: 'terminal'
-    color: 'gray-dark'
+      # Check the result of the Remote Quick Command
+      - name: Check Remote Quick Command answer
+        run: |
+          for result in ${{ steps.rqc.outputs.rqc_result }}; do 
+            echo "Result $result"
+          done
