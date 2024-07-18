@@ -26,7 +26,7 @@ jobs:
           CLIENT_KEY: ${{ secrets.STK_CLIENT_KEY }}
           CLIENT_REALM: ${{ secrets.STK_CLIENT_REALM }}
           QC_SLUG: code-review
-          FILE_EXTENSION: .md
+          FILE_EXTENSION: .py
 
 # Check the result of the Remote Quick Command
       - name: Check Remote Quick Command answer
