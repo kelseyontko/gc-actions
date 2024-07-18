@@ -11,17 +11,14 @@ permissions:
   issues: write
   pull-requests: write
 
-
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      # Checkout the repository with a fetch depth of 2
       - uses: actions/checkout@v4
         with: 
           fetch-depth: 2
 
-      # Use the StackSpotAI-CICD action to run a remote quick command
       - uses: victorsilvazup/stackspot-ai-execute-rqc@main
         id: rqc
         with:
@@ -31,7 +28,6 @@ jobs:
           QC_SLUG: code-review
           FILE_EXTENSION: .md
 
-      # Check the result of the Remote Quick Command
       - name: Check Remote Quick Command answer
         run: |
           for result in ${{ steps.rqc.outputs.rqc_result }}; do 
